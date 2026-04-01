@@ -2,39 +2,48 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const fetch = require('node-fetch');
-const app = express();
 const bcrypt = require('bcrypt');
 
+const app = express();
 
-
-app.use(express.json({ limit: '50mb' })); // 🔥 base64
+app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
-// 🔥 CONEXÃO MYSQL
-const mysql = require('mysql2');
 
+// 🔥 CONEXÃO MYSQL (CORRIGIDA)
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  port: Number(process.env.DB_PORT),
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   ssl: {
     rejectUnauthorized: false
   }
-});
+}).promise();
 
 
-db.query('SELECT * FROM chamados', (err, result) => {if (err) {
-    console.log('Erro MySQL:', err);
-    return;
+// 🔥 TESTE DE CONEXÃO
+(async () => {
+  try {
+    await db.query('SELECT 1');
+    console.log('✅ MYSQL CONECTADO');
+  } catch (err) {
+    console.log('❌ ERRO MYSQL:', err);
   }
-  console.log('MySQL conectado');
-});
+})();
 
+
+db.query('SELECT 1', (err) => {
+  if (err) {
+    console.log('❌ ERRO MYSQL:', err);
+  } else {
+    console.log('✅ MYSQL CONECTADO');
+  }
+});
 
 
 /*db.connect((err) => {
@@ -377,17 +386,13 @@ app.post('/chamados', (req, res) => {
 
 // 🔥 LISTAR CHAMADOS
 // 🔥 LISTAR CHAMADOS (CORRIGIDO)
-app.get('/chamados', (req, res) => {
-  db.query('SELECT * FROM chamados', (err, result) => {
-    if (err) {
-      console.log('❌ ERRO GET:', err);
-      return res.status(500).send(err);
-    }
+app.get('/chamados', async (req, res) => {
+  try {
+    const [result] = await db.query('SELECT * FROM chamados');
 
     const chamados = result.map((c) => ({
       ...c,
 
-      // 🔥 GARANTE ARRAY DE FOTOS
       fotos: (() => {
         try {
           return JSON.parse(c.fotos);
@@ -396,25 +401,21 @@ app.get('/chamados', (req, res) => {
         }
       })(),
 
-      // 🔥 FALLBACK (DADOS ANTIGOS)
       criadoPor: c.criadoPor || c.usuario || null,
-
-      // 🔥 CAMPOS NOVOS
       assumidoPor: c.assumidoPor || null,
       finalizadoPor: c.finalizadoPor || null,
       dataFinalizacao: c.dataFinalizacao || null,
       dataAssumido: c.dataAssumido || null,
-
-      // 🔥 SN
       sn: c.sn || null
     }));
 
-    console.log('📦 CHAMADOS FORMATADOS:', chamados);
-
     res.json(chamados);
-  });
-});
 
+  } catch (err) {
+    console.log('❌ ERRO GET:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
 app.put('/chamados/:id', (req, res) => {
   const { id } = req.params;
   const { status, usuario } = req.body;
