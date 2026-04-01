@@ -307,7 +307,7 @@ app.post('/usuarios/token', (req, res) => {
 // =========================
 
 // 🔥 CRIAR CHAMADO + NOTIFICAÇÃO
-app.post('/chamados', (req, res) => {
+app.post('/chamados', async (req, res) => {
   try {
     const {
       titulo,
@@ -331,45 +331,36 @@ app.post('/chamados', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
-    db.query(
-      sql,
-      [
-        titulo,
-        descricao,
-        loja,
-        setor,
-        status,
-        usuario, // 🔥 agora vai para criadoPor
-        departamento,
-        fotosJSON,
-        sn || null
-      ],
-      (err, result) => {
-        if (err) {
-          console.log('❌ ERRO MYSQL:', err);
-          return res.status(500).json({ erro: err.message });
-        }
+    // 🔥 INSERT
+    const [result] = await db.query(sql, [
+      titulo,
+      descricao,
+      loja,
+      setor,
+      status,
+      usuario,
+      departamento,
+      fotosJSON,
+      sn || null
+    ]);
 
-        const chamadoCriado = {
-          id: result.insertId,
-          titulo,
-          loja
-        };
+    const chamadoCriado = {
+      id: result.insertId,
+      titulo,
+      loja
+    };
 
-        // 🔥 NOTIFICAÇÃO
-        db.query(
-          "SELECT token FROM usuarios WHERE departamento = 'manutencao' AND token IS NOT NULL",
-          (err2, users) => {
-            if (!err2 && users.length > 0) {
-              const tokens = users.map(u => u.token);
-              enviarNotificacao(tokens, chamadoCriado);
-            }
-          }
-        );
-
-        res.json({ sucesso: true });
-      }
+    // 🔥 BUSCAR TOKENS
+    const [users] = await db.query(
+      "SELECT token FROM usuarios WHERE departamento = 'manutencao' AND token IS NOT NULL"
     );
+
+    if (users.length > 0) {
+      const tokens = users.map(u => u.token);
+      enviarNotificacao(tokens, chamadoCriado);
+    }
+
+    res.json({ sucesso: true });
 
   } catch (error) {
     console.log('💥 ERRO GERAL:', error);
