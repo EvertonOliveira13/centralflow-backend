@@ -12,10 +12,11 @@ app.use(cors());
 
 // 🔥 CONEXÃO MYSQL
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'Root@Everton123',
-  database: 'centralflow'
+  host: process.env.mysql.railway.internal,
+  user: process.env.root,
+  password: process.env.ADJWTiCGTFnLYvkcwZBgTDRrnsLtDecA,
+  database: process.env.railway,
+  port: process.env.3306
 });
 
 db.connect((err) => {
