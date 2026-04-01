@@ -11,24 +11,39 @@ app.use(express.json({ limit: '50mb' })); // 🔥 base64
 app.use(cors());
 
 // 🔥 CONEXÃO MYSQL
-const db = mysql.createConnection({
+const mysql = require('mysql2');
+
+const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
   ssl: {
     rejectUnauthorized: false
   }
 });
 
-db.connect((err) => {
-  if (err) {
+
+db.query('SELECT * FROM chamados', (err, result) => {if (err) {
     console.log('Erro MySQL:', err);
     return;
   }
   console.log('MySQL conectado');
 });
+
+
+
+/*db.connect((err) => {
+  if (err) {
+    console.log('Erro MySQL:', err);
+    return;
+  }
+  console.log('MySQL conectado');
+});*/
 
 
 // =========================
