@@ -37,13 +37,7 @@ const db = mysql.createPool({
 })();
 
 
-db.query('SELECT 1', (err) => {
-  if (err) {
-    console.log('❌ ERRO MYSQL:', err);
-  } else {
-    console.log('✅ MYSQL CONECTADO');
-  }
-});
+
 
 
 /*db.connect((err) => {
