@@ -136,6 +136,30 @@ app.post('/usuarios', async (req, res) => {
   }
 });
 
+
+// token
+
+app.post('/usuarios/token', async (req, res) => {
+  try {
+    const { usuario, token } = req.body;
+
+    await db.query(
+      'UPDATE usuarios SET token = ? WHERE nome = ?',
+      [token, usuario]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO TOKEN:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+
+
 // ALTERAR SENHA
 app.put('/usuarios/alterar-senha', async (req, res) => {
   try {
@@ -239,6 +263,56 @@ app.post('/chamados', async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
+
+
+
+
+// ATUALIZAR STATUS DO CHAMADO
+app.put('/chamados/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, usuario } = req.body;
+
+    console.log('🔥 UPDATE CHAMADO');
+    console.log('📥 ID:', id);
+    console.log('📥 STATUS:', status);
+    console.log('📥 USUARIO:', usuario);
+
+    let sql = `UPDATE chamados SET status = ?`;
+    let valores = [status];
+
+    // 🔥 ASSUMIR
+    if (status && status.trim().toUpperCase() === 'ANDAMENTO') {
+      sql += `, assumidoPor = ?, dataAssumido = NOW()`;
+      valores.push(usuario);
+    }
+
+    // 🔥 FINALIZAR
+    if (status && status.trim().toUpperCase() === 'FINALIZADO') {
+      sql += `, finalizadoPor = ?, dataFinalizacao = NOW()`;
+      valores.push(usuario);
+    }
+
+    sql += ` WHERE id = ?`;
+    valores.push(id);
+
+    await db.query(sql, valores);
+
+    console.log('✅ CHAMADO ATUALIZADO');
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO UPDATE:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+
+
+
 
 // =========================
 // 🚀 SERVER
