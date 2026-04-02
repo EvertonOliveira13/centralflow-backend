@@ -106,11 +106,14 @@ app.post('/login', (req, res) => {
 // =========================
 
 // 🔥 LISTAR
-app.get('/usuarios', (req, res) => {
-  db.query('SELECT * FROM usuarios', (err, result) => {
-    if (err) return res.status(500).json(err);
+app.get('/usuarios', async (req, res) => {
+  try {
+    const [result] = await db.query('SELECT * FROM usuarios');
     res.json(result);
-  });
+  } catch (err) {
+    console.log('❌ ERRO USUARIOS:', err);
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 // 🔥 CRIAR
