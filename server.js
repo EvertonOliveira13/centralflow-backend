@@ -198,6 +198,7 @@ app.put('/usuarios/alterar-senha', async (req, res) => {
 });
 
 
+// deletar usuario
 app.delete('/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -213,6 +214,66 @@ app.delete('/usuarios/:id', async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
+
+
+// editar usuarios
+
+// EDITAR USUÁRIO
+app.put('/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { senha, nivel, departamento, loja } = req.body;
+
+    let campos = [];
+    let valores = [];
+
+    // 🔐 senha (se vier)
+    if (senha) {
+      const hash = await bcrypt.hash(senha, 10);
+      campos.push('senha = ?');
+      valores.push(hash);
+    }
+
+    if (nivel) {
+      campos.push('nivel = ?');
+      valores.push(nivel);
+    }
+
+    if (departamento) {
+      campos.push('departamento = ?');
+      valores.push(departamento);
+    }
+
+    if (loja !== undefined) {
+      campos.push('loja = ?');
+      valores.push(loja);
+    }
+
+    if (campos.length === 0) {
+      return res.status(400).json({ erro: 'Nada para atualizar' });
+    }
+
+    const sql = `
+      UPDATE usuarios 
+      SET ${campos.join(', ')}
+      WHERE id = ?
+    `;
+
+    valores.push(id);
+
+    await db.query(sql, valores);
+
+    console.log('✏️ USUARIO EDITADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO EDITAR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
 
 // =========================
 // 📄 CHAMADOS
