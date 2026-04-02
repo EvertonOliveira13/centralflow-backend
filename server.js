@@ -197,6 +197,23 @@ app.put('/usuarios/alterar-senha', async (req, res) => {
   }
 });
 
+
+app.delete('/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('🗑️ DELETANDO USUARIO:', id);
+
+    await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO DELETE:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 // =========================
 // 📄 CHAMADOS
 // =========================
