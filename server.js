@@ -108,10 +108,16 @@ app.post('/login', (req, res) => {
 // 🔥 LISTAR
 app.get('/usuarios', async (req, res) => {
   try {
+    console.log('📥 GET /usuarios');
+
     const [result] = await db.query('SELECT * FROM usuarios');
+
+    console.log('✅ RESULT:', result);
+
     res.json(result);
+
   } catch (err) {
-    console.log('❌ ERRO USUARIOS:', err);
+    console.log('❌ ERRO USUARIOS COMPLETO:', err);
     res.status(500).json({ erro: err.message });
   }
 });
