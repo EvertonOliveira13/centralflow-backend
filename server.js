@@ -6,11 +6,23 @@ const bcrypt = require('bcrypt');
 
 const app = express();
 
+console.log('🔥 NOVO DEPLOY ATIVO');
+
+// 🔥 CAPTURA ERROS
+process.on('uncaughtException', (err) => {
+  console.log('💥 ERRO NÃO TRATADO:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.log('💥 PROMISE ERROR:', err);
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
-
-// 🔥 CONEXÃO MYSQL (CORRIGIDA)
+// =========================
+// 🔥 MYSQL (PADRÃO PROMISE)
+// =========================
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -20,13 +32,10 @@ const db = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 }).promise();
 
-
-// 🔥 TESTE DE CONEXÃO
+// 🔥 TESTE CONEXÃO
 (async () => {
   try {
     await db.query('SELECT 1');
@@ -36,21 +45,8 @@ const db = mysql.createPool({
   }
 })();
 
-
-
-
-
-/*db.connect((err) => {
-  if (err) {
-    console.log('Erro MySQL:', err);
-    return;
-  }
-  console.log('MySQL conectado');
-});*/
-
-
 // =========================
-// 🔔 FUNÇÃO NOTIFICAÇÃO
+// 🔔 NOTIFICAÇÃO
 // =========================
 async function enviarNotificacao(tokens, chamado) {
   const mensagens = tokens.map(token => ({
@@ -58,29 +54,21 @@ async function enviarNotificacao(tokens, chamado) {
     sound: 'default',
     title: '🔧 Novo chamado',
     body: `${chamado.titulo} - ${chamado.loja}`,
-    
-    data: {
-      id: chamado.id // 🔥 ESSENCIAL
-    }
+    data: { id: chamado.id }
   }));
 
   await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mensagens)
   });
 }
-
 
 // =========================
 // 🔐 LOGIN
 // =========================
 app.post('/login', async (req, res) => {
   try {
-    console.log('📥 BODY LOGIN:', req.body);
-
     const { nome, senha } = req.body;
 
     const [rows] = await db.query(
@@ -100,13 +88,11 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ erro: 'Senha inválida' });
     }
 
-    console.log('✅ LOGIN OK');
-
     res.json(usuario);
 
   } catch (err) {
     console.log('💥 ERRO LOGIN:', err);
-    res.status(500).json({ erro: 'Erro no servidor' });
+    res.status(500).json({ erro: err.message });
   }
 });
 
@@ -114,89 +100,57 @@ app.post('/login', async (req, res) => {
 // 👤 USUÁRIOS
 // =========================
 
-// 🔥 LISTAR
+// LISTAR
 app.get('/usuarios', async (req, res) => {
   try {
-    console.log('📥 GET /usuarios');
-
-    const [result] = await db.query('SELECT * FROM usuarios');
-
-    console.log('✅ RESULT:', result);
-
-    res.json(result);
-
+    const [rows] = await db.query('SELECT * FROM usuarios');
+    res.json(rows);
   } catch (err) {
-    console.log('❌ ERRO USUARIOS COMPLETO:', err);
+    console.log('💥 ERRO USUARIOS:', err);
     res.status(500).json({ erro: err.message });
   }
 });
 
-// 🔥 CRIAR
+// CRIAR
 app.post('/usuarios', async (req, res) => {
-  const { nome, senha, nivel, departamento, loja } = req.body;
-
   try {
+    const { nome, senha, nivel, departamento, loja } = req.body;
+
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    const sql = `
-      INSERT INTO usuarios (nome, senha, nivel, departamento, loja)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-
-    db.query(
-      sql,
-      [nome, senhaHash, nivel, departamento, loja],
-      (err) => {
-        if (err) {
-          console.log('❌ Erro ao criar usuário:', err);
-          return res.status(500).json(err);
-        }
-
-        res.json({ message: 'Usuário criado com sucesso' });
-      }
+    await db.query(
+      `INSERT INTO usuarios (nome, senha, nivel, departamento, loja)
+       VALUES (?, ?, ?, ?, ?)`,
+      [nome, senhaHash, nivel, departamento, loja]
     );
 
-  } catch (error) {
-    console.log('❌ ERRO HASH:', error);
-    res.status(500).json({ erro: 'Erro ao criptografar senha' });
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ erro: 'Usuário já existe' });
+    }
+
+    console.log('💥 ERRO CRIAR USUARIO:', err);
+    res.status(500).json({ erro: err.message });
   }
 });
 
-// 🔥 SALVAR TOKEN PUSH
-app.post('/usuarios/token', (req, res) => {
-  const { usuario, token } = req.body;
+// ALTERAR SENHA
+app.put('/usuarios/alterar-senha', async (req, res) => {
+  try {
+    const { nome, senhaAtual, novaSenha } = req.body;
 
-  const sql = `UPDATE usuarios SET token = ? WHERE nome = ?`;
+    const [rows] = await db.query(
+      'SELECT * FROM usuarios WHERE nome = ?',
+      [nome]
+    );
 
-  db.query(sql, [token, usuario], (err) => {
-    if (err) {
-      console.log('❌ Erro token:', err);
-      return res.status(500).json(err);
-    }
-
-    res.json({ sucesso: true });
-  });
-});
-
-
-// ========= alterar senha ========
-
-app.put('/usuarios/alterar-senha', (req, res) => {
-  const { nome, senhaAtual, novaSenha } = req.body;
-
-  const sql = 'SELECT * FROM usuarios WHERE nome = ?';
-
-  db.query(sql, [nome], async (err, result) => {
-    if (err) {
-      console.log('❌ ERRO:', err);
-      return res.status(500).json({ erro: 'Erro no servidor' });
-    }
-
-    if (result.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
     }
 
-    const usuario = result[0];
+    const usuario = rows[0];
 
     const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
 
@@ -206,156 +160,61 @@ app.put('/usuarios/alterar-senha', (req, res) => {
 
     const novaSenhaHash = await bcrypt.hash(novaSenha, 10);
 
-    const updateSql = `
-      UPDATE usuarios
-      SET senha = ?
-      WHERE nome = ?
-    `;
-
-    db.query(updateSql, [novaSenhaHash, nome], (err) => {
-      if (err) {
-        console.log('❌ ERRO UPDATE:', err);
-        return res.status(500).json({ erro: 'Erro ao atualizar senha' });
-      }
-
-      res.json({ sucesso: true });
-    });
-  });
-});
-
-
-
-
-
-
-// 🔥 EDITAR
-app.put('/usuarios/:id', async (req, res) => {
-  const { id } = req.params;
-  const { senha, nivel, departamento, loja } = req.body;
-
-  let campos = [];
-  let valores = [];
-
-  if (senha) {
-    const hash = await bcrypt.hash(senha, 10); // 🔥 AQUI
-    campos.push('senha = ?');
-    valores.push(hash);
-  }
-
-  if (nivel) {
-    campos.push('nivel = ?');
-    valores.push(nivel);
-  }
-
-  if (departamento) {
-    campos.push('departamento = ?');
-    valores.push(departamento);
-  }
-
-  if (loja !== undefined) {
-    campos.push('loja = ?');
-    valores.push(loja);
-  }
-
-  if (campos.length === 0) {
-    return res.status(400).json({ erro: 'Nada para atualizar' });
-  }
-
-  const sql = `
-    UPDATE usuarios 
-    SET ${campos.join(', ')}
-    WHERE id = ?
-  `;
-
-  valores.push(id);
-
-  db.query(sql, valores, (err, result) => {
-    if (err) {
-      console.log('❌ ERRO SQL:', err);
-      return res.status(500).json({ erro: err.message });
-    }
+    await db.query(
+      'UPDATE usuarios SET senha = ? WHERE nome = ?',
+      [novaSenhaHash, nome]
+    );
 
     res.json({ sucesso: true });
-  });
+
+  } catch (err) {
+    console.log('💥 ERRO ALTERAR SENHA:', err);
+    res.status(500).json({ erro: err.message });
+  }
 });
-// 🔥 DELETAR
-app.delete('/usuarios/:id', (req, res) => {
-  const { id } = req.params;
-
-  const sql = 'DELETE FROM usuarios WHERE id = ?';
-
-  db.query(sql, [id], (err) => {
-    if (err) {
-      console.log('❌ ERRO DELETE:', err);
-      return res.status(500).json({ erro: err.message });
-    }
-
-    res.json({ sucesso: true });
-  });
-});
-
-
-
-app.post('/usuarios/token', (req, res) => {
-  const { usuario, token } = req.body;
-
-  console.log('📱 Salvando token:', usuario, token);
-
-  const sql = 'UPDATE usuarios SET token = ? WHERE nome = ?';
-
-  db.query(sql, [token, usuario], (err) => {
-    if (err) {
-      console.log('❌ Erro ao salvar token:', err);
-      return res.status(500).json({ erro: 'Erro ao salvar token' });
-    }
-
-    res.json({ sucesso: true });
-  });
-});
-
-
-
 
 // =========================
 // 📄 CHAMADOS
 // =========================
 
-// 🔥 CRIAR CHAMADO + NOTIFICAÇÃO
+// LISTAR
+app.get('/chamados', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM chamados');
+
+    const chamados = rows.map(c => ({
+      ...c,
+      fotos: (() => {
+        try { return JSON.parse(c.fotos); }
+        catch { return []; }
+      })()
+    }));
+
+    res.json(chamados);
+
+  } catch (err) {
+    console.log('💥 ERRO CHAMADOS:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+// CRIAR
 app.post('/chamados', async (req, res) => {
   try {
     const {
-      titulo,
-      descricao,
-      loja,
-      setor,
-      status,
-      usuario,
-      departamento,
-      fotos,
-      sn
+      titulo, descricao, loja, setor,
+      status, usuario, departamento, fotos, sn
     } = req.body;
 
-    const fotosJSON = fotos && Array.isArray(fotos)
-      ? JSON.stringify(fotos)
-      : '[]';
+    const fotosJSON = JSON.stringify(fotos || []);
 
-    const sql = `
-      INSERT INTO chamados 
+    const [result] = await db.query(`
+      INSERT INTO chamados
       (titulo, descricao, loja, setor, status, criadoPor, departamento, fotos, sn, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    `;
-
-    // 🔥 INSERT
-    const [result] = await db.query(sql, [
-      titulo,
-      descricao,
-      loja,
-      setor,
-      status,
-      usuario,
-      departamento,
-      fotosJSON,
-      sn || null
+    `, [
+      titulo, descricao, loja, setor,
+      status, usuario, departamento, fotosJSON, sn || null
     ]);
 
     const chamadoCriado = {
@@ -364,7 +223,6 @@ app.post('/chamados', async (req, res) => {
       loja
     };
 
-    // 🔥 BUSCAR TOKENS
     const [users] = await db.query(
       "SELECT token FROM usuarios WHERE departamento = 'manutencao' AND token IS NOT NULL"
     );
@@ -376,86 +234,15 @@ app.post('/chamados', async (req, res) => {
 
     res.json({ sucesso: true });
 
-  } catch (error) {
-    console.log('💥 ERRO GERAL:', error);
-    res.status(500).json({ erro: error.message });
-  }
-});
-
-
-// 🔥 LISTAR CHAMADOS
-// 🔥 LISTAR CHAMADOS (CORRIGIDO)
-app.get('/chamados', async (req, res) => {
-  try {
-    const [result] = await db.query('SELECT * FROM chamados');
-
-    const chamados = result.map((c) => ({
-      ...c,
-
-      fotos: (() => {
-        try {
-          return JSON.parse(c.fotos);
-        } catch {
-          return c.fotos ? [c.fotos] : [];
-        }
-      })(),
-
-      criadoPor: c.criadoPor || c.usuario || null,
-      assumidoPor: c.assumidoPor || null,
-      finalizadoPor: c.finalizadoPor || null,
-      dataFinalizacao: c.dataFinalizacao || null,
-      dataAssumido: c.dataAssumido || null,
-      sn: c.sn || null
-    }));
-
-    res.json(chamados);
-
   } catch (err) {
-    console.log('❌ ERRO GET:', err);
+    console.log('💥 ERRO CHAMADO:', err);
     res.status(500).json({ erro: err.message });
   }
 });
-app.put('/chamados/:id', (req, res) => {
-  const { id } = req.params;
-  const { status, usuario } = req.body;
-
-  let sql = `UPDATE chamados SET status = ?`;
-  let valores = [status];
-
-  // 🔥 ASSUMIR
-if (status?.toUpperCase() === 'ANDAMENTO') {
-  sql += `, assumidoPor = ?, dataAssumido = NOW()`;
-  valores.push(usuario);
-}
-
-  // 🔥 FINALIZAR
-  if (status?.toUpperCase() === 'FINALIZADO') {
-    sql += `, finalizadoPor = ?, dataFinalizacao = NOW()`;
-    valores.push(usuario);
-  }
-
-  sql += ` WHERE id = ?`;
-  valores.push(id);
-
-  db.query(sql, valores, (err, result) => {
-    if (err) {
-      console.log('❌ ERRO:', err);
-      return res.status(500).json(err);
-    }
-
-    console.log('✅ UPDATE:', result);
-
-    res.json({ sucesso: true });
-  });
-});
-
-
-
-
-
 
 // =========================
-
+// 🚀 SERVER
+// =========================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, '0.0.0.0', () => {
