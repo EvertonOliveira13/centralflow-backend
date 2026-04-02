@@ -12,7 +12,11 @@ app.use(cors());
 
 // 🔥 CONEXÃO MYSQL (CORRIGIDA)
 const db = mysql.createPool({
-  uri: process.env.DATABASE_URL,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -73,22 +77,22 @@ async function enviarNotificacao(tokens, chamado) {
 // =========================
 // 🔐 LOGIN
 // =========================
-app.post('/login', (req, res) => {
-  const { nome, senha } = req.body;
+app.post('/login', async (req, res) => {
+  try {
+    console.log('📥 BODY LOGIN:', req.body);
 
-  const sql = 'SELECT * FROM usuarios WHERE nome = ?';
+    const { nome, senha } = req.body;
 
-  db.query(sql, [nome], async (err, result) => {
-    if (err) {
-      console.log('ERRO LOGIN:', err);
-      return res.status(500).send(err);
-    }
+    const [rows] = await db.query(
+      'SELECT * FROM usuarios WHERE nome = ?',
+      [nome]
+    );
 
-    if (result.length === 0) {
+    if (rows.length === 0) {
       return res.status(401).json({ erro: 'Usuário inválido' });
     }
 
-    const usuario = result[0];
+    const usuario = rows[0];
 
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
 
@@ -96,10 +100,15 @@ app.post('/login', (req, res) => {
       return res.status(401).json({ erro: 'Senha inválida' });
     }
 
-    res.json(usuario);
-  });
-});
+    console.log('✅ LOGIN OK');
 
+    res.json(usuario);
+
+  } catch (err) {
+    console.log('💥 ERRO LOGIN:', err);
+    res.status(500).json({ erro: 'Erro no servidor' });
+  }
+});
 
 // =========================
 // 👤 USUÁRIOS
