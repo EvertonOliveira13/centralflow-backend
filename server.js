@@ -344,6 +344,27 @@ app.post('/chamados', async (req, res) => {
 
 
 
+// excluir chamados
+
+
+app.delete('/chamados/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await db.query('DELETE FROM chamados WHERE id = ?', [id]);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO DELETE CHAMADO:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+
+
 
 // ATUALIZAR STATUS DO CHAMADO
 app.put('/chamados/:id', async (req, res) => {
