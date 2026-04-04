@@ -57,11 +57,17 @@ async function enviarNotificacao(tokens, chamado) {
     data: { id: chamado.id }
   }));
 
-  await fetch('https://exp.host/--/api/v2/push/send', {
+  console.log('🚀 ENVIANDO:', mensagens);
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mensagens)
   });
+
+  const data = await response.json();
+
+  console.log('📬 RESPOSTA EXPO:', data);
 }
 
 // =========================
@@ -325,9 +331,14 @@ app.post('/chamados', async (req, res) => {
       loja
     };
 
-    const [users] = await db.query(
-      "SELECT token FROM usuarios WHERE departamento = 'manutencao' AND token IS NOT NULL"
-    );
+    const [users] = await db.query(`
+      SELECT token FROM usuarios 
+      WHERE LOWER(TRIM(departamento)) = 'manutencao'
+      AND token IS NOT NULL
+      AND token != ''
+    `);
+
+      console.log('📱 TOKENS ENCONTRADOS:', users);
 
     if (users.length > 0) {
       const tokens = users.map(u => u.token);
