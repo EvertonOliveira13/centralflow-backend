@@ -398,9 +398,28 @@ app.put('/chamados/:id', async (req, res) => {
 
     // 🔥 ASSUMIR
     if (status && status.trim().toUpperCase() === 'ANDAMENTO') {
-      sql += `, assumidoPor = ?, dataAssumido = NOW()`;
-      valores.push(usuario);
-    }
+
+  // 🔥 conta chamados em andamento do usuário
+  const [rows] = await db.query(
+    `SELECT COUNT(*) as total 
+     FROM chamados 
+     WHERE assumidoPor = ? AND status = 'ANDAMENTO'`,
+    [usuario]
+  );
+
+  const total = rows[0].total;
+
+  console.log('📊 Chamados em andamento:', total);
+
+  if (total >= 5) {
+    return res.status(400).json({
+      erro: 'Você já atingiu o limite de 5 chamados em andamento'
+    });
+  }
+
+  sql += `, assumidoPor = ?, dataAssumido = NOW()`;
+  valores.push(usuario);
+}
 
     // 🔥 FINALIZAR
     if (status && status.trim().toUpperCase() === 'FINALIZADO') {
