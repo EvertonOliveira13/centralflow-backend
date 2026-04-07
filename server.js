@@ -2,14 +2,30 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-
+const jwt = require('jsonwebtoken')
 
 const fetch = (...args) =>
   import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-
-
 const app = express();
+
+const rateLimit = require('express-rate-limit');
+
+// 🔒 proteção global (opcional)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200
+});
+
+// 🔥 proteção no login 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { erro: 'Muitas tentativas, tente novamente mais tarde' }
+});
+
+app.use('/login', loginLimiter);
+
 
 console.log('🔥 NOVO DEPLOY ATIVO');
 
@@ -24,6 +40,8 @@ process.on('unhandledRejection', (err) => {
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
+app.use(limiter);
+
 
 // =========================
 // 🔥 MYSQL (PADRÃO PROMISE)
@@ -99,7 +117,22 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ erro: 'Senha inválida' });
     }
 
-    res.json(usuario);
+    // 🔒 REMOVE SENHA DO OBJETO
+    delete usuario.senha;
+
+    // 🔥 CRIA TOKEN
+    const token = jwt.sign(
+      {
+        id: usuario.id,
+        nome: usuario.nome,
+        nivel: usuario.nivel,
+        departamento: usuario.departamento
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ usuario, token });
 
   } catch (err) {
     console.log('💥 ERRO LOGIN:', err);
@@ -107,12 +140,32 @@ app.post('/login', async (req, res) => {
   }
 });
 
+function auth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ erro: 'Token não enviado' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ erro: 'Token inválido' });
+  }
+}
+
+
+
 // =========================
 // 👤 USUÁRIOS
 // =========================
 
 // LISTAR
-app.get('/usuarios', async (req, res) => {
+app.get('/usuarios', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM usuarios');
     res.json(rows);
@@ -123,7 +176,12 @@ app.get('/usuarios', async (req, res) => {
 });
 
 // CRIAR
-app.post('/usuarios', async (req, res) => {
+app.post('/usuarios', auth, async (req, res) => {
+
+  if (req.user.nivel !== 'adm') {
+  return res.status(403).json({ erro: 'Sem permissão' });
+}
+
   try {
     const { nome, senha, nivel, departamento, loja } = req.body;
 
@@ -150,9 +208,10 @@ app.post('/usuarios', async (req, res) => {
 
 // token
 
-app.post('/usuarios/token', async (req, res) => {
+app.post('/usuarios/token', auth, async (req, res) => {
   try {
-    const { usuario, token } = req.body;
+    const { token } = req.body;
+    const usuario = req.user.nome;
 
     await db.query(
       'UPDATE usuarios SET token = ? WHERE nome = ?',
@@ -172,9 +231,10 @@ app.post('/usuarios/token', async (req, res) => {
 
 
 // ALTERAR SENHA
-app.put('/usuarios/alterar-senha', async (req, res) => {
+app.put('/usuarios/alterar-senha', auth, async (req, res) => {
   try {
-    const { nome, senhaAtual, novaSenha } = req.body;
+    const { senhaAtual, novaSenha } = req.body;
+    const nome = req.user.nome;
 
     const [rows] = await db.query(
       'SELECT * FROM usuarios WHERE nome = ?',
@@ -210,13 +270,33 @@ app.put('/usuarios/alterar-senha', async (req, res) => {
 
 
 // deletar usuario
-app.delete('/usuarios/:id', async (req, res) => {
+app.delete('/usuarios/:id', auth, async (req, res) => {
   try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
     const { id } = req.params;
 
-    console.log('🗑️ DELETANDO USUARIO:', id);
+    // 🔥 evitar auto-delete
+    if (Number(req.user.id) === Number(id)) {
+      return res.status(400).json({ erro: 'Você não pode deletar seu próprio usuário' });
+    }
 
+    // 🔥 verificar se existe
+    const [rows] = await db.query(
+      'SELECT id FROM usuarios WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+
+    // 🔥 deletar
     await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
+
+    console.log('🗑️ USUARIO DELETADO:', id);
 
     res.json({ sucesso: true });
 
@@ -225,12 +305,15 @@ app.delete('/usuarios/:id', async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
-
-
 // editar usuarios
 
 // EDITAR USUÁRIO
-app.put('/usuarios/:id', async (req, res) => {
+app.put('/usuarios/:id', auth, async (req, res) => {
+
+  if (req.user.nivel !== 'adm') {
+  return res.status(403).json({ erro: 'Sem permissão' });
+}
+
   try {
     const { id } = req.params;
     const { senha, nivel, departamento, loja } = req.body;
@@ -291,7 +374,7 @@ app.put('/usuarios/:id', async (req, res) => {
 // =========================
 
 // LISTAR
-app.get('/chamados', async (req, res) => {
+app.get('/chamados', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM chamados');
 
@@ -312,12 +395,16 @@ app.get('/chamados', async (req, res) => {
 });
 
 // CRIAR
-app.post('/chamados', async (req, res) => {
+app.post('/chamados', auth, async (req, res) => {
   try {
     const {
       titulo, descricao, loja, setor,
-      status, usuario, departamento, fotos, sn
+      status, fotos, sn
     } = req.body;
+
+    // 🔒 dados confiáveis vêm do token
+    const usuario = req.user.nome;
+    const departamento = req.user.departamento;
 
     const fotosJSON = JSON.stringify(fotos || []);
 
@@ -326,8 +413,15 @@ app.post('/chamados', async (req, res) => {
       (titulo, descricao, loja, setor, status, criadoPor, departamento, fotos, sn, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `, [
-      titulo, descricao, loja, setor,
-      status, usuario, departamento, fotosJSON, sn || null
+      titulo,
+      descricao,
+      loja,
+      setor,
+      status,
+      usuario,
+      departamento,
+      fotosJSON,
+      sn || null
     ]);
 
     const chamadoCriado = {
@@ -343,7 +437,7 @@ app.post('/chamados', async (req, res) => {
       AND token != ''
     `);
 
-      console.log('📱 TOKENS ENCONTRADOS:', users);
+    console.log('📱 TOKENS ENCONTRADOS:', users);
 
     if (users.length > 0) {
       const tokens = users.map(u => u.token);
@@ -359,15 +453,31 @@ app.post('/chamados', async (req, res) => {
 });
 
 
-
 // excluir chamados
 
 
-app.delete('/chamados/:id', async (req, res) => {
+app.delete('/chamados/:id', auth, async (req, res) => {
   try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
     const { id } = req.params;
 
+    // 🔍 verifica se existe
+    const [rows] = await db.query(
+      'SELECT id FROM chamados WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Chamado não encontrado' });
+    }
+
+    // 🗑️ deleta
     await db.query('DELETE FROM chamados WHERE id = ?', [id]);
+
+    console.log('🗑️ CHAMADO DELETADO:', id);
 
     res.json({ sucesso: true });
 
@@ -381,48 +491,76 @@ app.delete('/chamados/:id', async (req, res) => {
 
 
 
-
 // ATUALIZAR STATUS DO CHAMADO
-app.put('/chamados/:id', async (req, res) => {
+app.put('/chamados/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, usuario } = req.body;
+    const { status } = req.body;
+    const usuario = req.user.nome;
+
+    if (!status) {
+      return res.status(400).json({ erro: 'Status é obrigatório' });
+    }
 
     console.log('🔥 UPDATE CHAMADO');
     console.log('📥 ID:', id);
     console.log('📥 STATUS:', status);
     console.log('📥 USUARIO:', usuario);
 
+    // 🔍 verifica se chamado existe
+  const [existe] = await db.query(
+  'SELECT id, status, assumidoPor FROM chamados WHERE id = ?',
+  [id]
+);
+
+    if (existe.length === 0) {
+      return res.status(404).json({ erro: 'Chamado não encontrado' });
+    }
+
     let sql = `UPDATE chamados SET status = ?`;
     let valores = [status];
 
     // 🔥 ASSUMIR
-    if (status && status.trim().toUpperCase() === 'ANDAMENTO') {
+    if (status.trim().toUpperCase() === 'ANDAMENTO') {
 
-  // 🔥 conta chamados em andamento do usuário
-  const [rows] = await db.query(
-    `SELECT COUNT(*) as total 
-     FROM chamados 
-     WHERE assumidoPor = ? AND status = 'ANDAMENTO'`,
-    [usuario]
-  );
+      const [rows] = await db.query(
+        `SELECT COUNT(*) as total 
+         FROM chamados 
+         WHERE assumidoPor = ? 
+         AND status = 'ANDAMENTO'
+         AND id != ?`,
+        [usuario, id]
+      );
 
-  const total = rows[0].total;
+      const total = rows[0].total;
 
-  console.log('📊 Chamados em andamento:', total);
+      console.log('📊 Chamados em andamento:', total);
 
-  if (total >= 5) {
-    return res.status(400).json({
-      erro: 'Você já atingiu o limite de 5 chamados em andamento'
-    });
-  }
+      if (total >= 5) {
+        return res.status(400).json({
+          erro: 'Você já atingiu o limite de 5 chamados em andamento'
+        });
+      }
 
-  sql += `, assumidoPor = ?, dataAssumido = NOW()`;
-  valores.push(usuario);
-}
+      sql += `, assumidoPor = ?, dataAssumido = NOW()`;
+      valores.push(usuario);
+    }
 
     // 🔥 FINALIZAR
-    if (status && status.trim().toUpperCase() === 'FINALIZADO') {
+    if (status.trim().toUpperCase() === 'FINALIZADO') {
+
+      const chamado = existe[0];
+
+      if (
+        chamado.assumidoPor &&
+        chamado.assumidoPor !== usuario &&
+        req.user.nivel !== 'adm'
+      ) {
+        return res.status(403).json({
+          erro: 'Apenas quem assumiu ou um administrador pode finalizar este chamado'
+        });
+      }
+
       sql += `, finalizadoPor = ?, dataFinalizacao = NOW()`;
       valores.push(usuario);
     }
@@ -441,8 +579,6 @@ app.put('/chamados/:id', async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
-
-
 
 
 
