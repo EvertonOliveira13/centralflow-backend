@@ -1055,6 +1055,58 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
 
 
 
+//=========== CEASA CRIAR ITEM ===============//
+
+app.post('/ceasa-itens', auth, async (req, res) => {
+  try {
+
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { nome, categoria } = req.body;
+
+    if (!nome || !categoria) {
+      return res.status(400).json({ erro: 'Nome e categoria obrigatórios' });
+    }
+
+    await db.query(
+      'INSERT INTO ceasa_itens (nome, categoria) VALUES (?, ?)',
+      [nome, categoria]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (error) {
+    console.log('ERRO CEASA ITENS:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+//=================== INATIVAR ITEM CEASA ======================//
+
+app.put('/ceasa-itens/:id/inativar', auth, async (req, res) => {
+  await db.query(
+    'UPDATE ceasa_itens SET ativo = 0 WHERE id = ?',
+    [req.params.id]
+  );
+
+  res.json({ sucesso: true });
+});
+
+
+//==================== ATIVAR ITEM CEASA =====================//
+
+app.put('/ceasa-itens/:id/ativar', auth, async (req, res) => {
+  await db.query(
+    'UPDATE ceasa_itens SET ativo = 1 WHERE id = ?',
+    [req.params.id]
+  );
+
+  res.json({ sucesso: true });
+});
+
+
 
 
 // =========================
