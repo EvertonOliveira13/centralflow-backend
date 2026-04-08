@@ -611,7 +611,54 @@ app.post('/lojas', auth, async (req, res) => {
 });
 
 
-// DELETAR SOMENTE SE FOR USUARIO
+
+// CRIAR SETORES
+
+app.post('/setores', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { nome } = req.body;
+
+    if (!nome) {
+      return res.status(400).json({ erro: 'Nome obrigatório' });
+    }
+
+    await db.query(
+      'INSERT INTO setores (nome) VALUES (?)',
+      [nome]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ erro: 'Setor já existe' });
+    }
+
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+// LISTAR SETORES
+
+app.get('/setores', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM setores ORDER BY nome');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+
+
+// DELETAR LOJA SOMENTE SE FOR USUARIO ADM
 
 app.delete('/lojas/:id', auth, async (req, res) => {
   if (req.user.nivel !== 'adm') {
