@@ -585,9 +585,7 @@ app.put('/chamados/:id', auth, async (req, res) => {
 
 app.get('/lojas', auth, async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT * FROM lojas WHERE ativo = TRUE ORDER BY nome'
-    );
+    const [rows] = await db.query('SELECT * FROM lojas');
     res.json(rows);
   } catch (err) {
     res.status(500).json({ erro: err.message });
