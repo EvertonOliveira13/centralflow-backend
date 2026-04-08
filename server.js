@@ -584,8 +584,14 @@ app.put('/chamados/:id', auth, async (req, res) => {
 
 
 app.get('/lojas', auth, async (req, res) => {
-  const [rows] = await db.query('SELECT * FROM lojas');
-  res.json(rows);
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM lojas WHERE ativo = TRUE ORDER BY nome'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 
@@ -716,6 +722,124 @@ app.delete('/setores/:id', auth, async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
+
+
+// inativar lojas
+
+app.put('/lojas/:id/inativar', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    await db.query(
+      'UPDATE lojas SET ativo = FALSE WHERE id = ?',
+      [id]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+// ativar lojas
+
+app.put('/lojas/:id/ativar', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await db.query(
+      'UPDATE lojas SET ativo = TRUE WHERE id = ?',
+      [id]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+// INATIVAR OS SETORES
+
+app.put('/setores/:id/inativar', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    // 🔍 verifica se existe
+    const [rows] = await db.query(
+      'SELECT id FROM setores WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Setor não encontrado' });
+    }
+
+    // 🔴 inativa
+    await db.query(
+      'UPDATE setores SET ativo = 0 WHERE id = ?',
+      [id]
+    );
+
+    console.log('🔴 SETOR INATIVADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO INATIVAR SETOR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+// ATIVAR OS SETORES
+
+app.put('/setores/:id/ativar', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    // 🔍 verifica se existe
+    const [rows] = await db.query(
+      'SELECT id FROM setores WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Setor não encontrado' });
+    }
+
+    // 🟢 ativa
+    await db.query(
+      'UPDATE setores SET ativo = 1 WHERE id = ?',
+      [id]
+    );
+
+    console.log('🟢 SETOR ATIVADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO ATIVAR SETOR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+}); 
+
 
 // =========================
 // 🚀 SERVER
