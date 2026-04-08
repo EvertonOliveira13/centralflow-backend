@@ -839,6 +839,133 @@ app.put('/setores/:id/ativar', auth, async (req, res) => {
 }); 
 
 
+//================= CRIAR DEPARTAMENTO =======================//
+
+app.post('/departamentos', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { nome } = req.body;
+
+    if (!nome || !nome.trim()) {
+      return res.status(400).json({ erro: 'Nome é obrigatório' });
+    }
+
+    await db.query(
+      'INSERT INTO departamentos (nome) VALUES (?)',
+      [nome.trim()]
+    );
+
+    console.log('🏢 DEPARTAMENTO CRIADO:', nome);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO CRIAR DEPARTAMENTO:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+//================= LISTAR DEMPARTAMENTOS ====================//
+
+app.get('/departamentos', auth, async (req, res) => {
+  try {
+    const { ativo } = req.query;
+
+    let sql = 'SELECT * FROM departamentos';
+
+    if (ativo === '1') {
+      sql += ' WHERE ativo = 1';
+    }
+
+    const [rows] = await db.query(sql);
+
+    res.json(rows);
+
+  } catch (err) {
+    console.log('💥 ERRO LISTAR DEPARTAMENTOS:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+//==================== INATIVAR DEPARTAMENTO =================//
+
+app.put('/departamentos/:id/inativar', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    const [rows] = await db.query(
+      'SELECT id FROM departamentos WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Departamento não encontrado' });
+    }
+
+    await db.query(
+      'UPDATE departamentos SET ativo = 0 WHERE id = ?',
+      [id]
+    );
+
+    console.log('🔴 DEPARTAMENTO INATIVADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO INATIVAR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+//===================== ATIVAR DEPARTMANETO ===================//
+
+app.put('/departamentos/:id/ativar', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    const [rows] = await db.query(
+      'SELECT id FROM departamentos WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Departamento não encontrado' });
+    }
+
+    await db.query(
+      'UPDATE departamentos SET ativo = 1 WHERE id = ?',
+      [id]
+    );
+
+    console.log('🟢 DEPARTAMENTO ATIVADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO ATIVAR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+
+
+
 // =========================
 // 🚀 SERVER
 // =========================
