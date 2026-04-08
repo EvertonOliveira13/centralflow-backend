@@ -164,7 +164,7 @@ function auth(req, res, next) {
 // 👤 USUÁRIOS
 // =========================
 
-// LISTAR
+// LISTAR USUARIOS
 app.get('/usuarios', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM usuarios');
@@ -175,7 +175,7 @@ app.get('/usuarios', auth, async (req, res) => {
   }
 });
 
-// CRIAR
+// CRIAR USUARIOS
 app.post('/usuarios', auth, async (req, res) => {
 
   if (req.user.nivel !== 'adm') {
@@ -214,14 +214,13 @@ app.post('/usuarios/token', auth, async (req, res) => {
     const usuario = req.user.nome;
 
     await db.query(
-      'UPDATE usuarios SET token = ? WHERE nome = ?',
+      'UPDATE usuarios SET push_token = ? WHERE nome = ?',
       [token, usuario]
     );
 
     res.json({ sucesso: true });
 
   } catch (err) {
-    console.log('💥 ERRO TOKEN:', err);
     res.status(500).json({ erro: err.message });
   }
 });
@@ -373,7 +372,7 @@ app.put('/usuarios/:id', auth, async (req, res) => {
 // 📄 CHAMADOS
 // =========================
 
-// LISTAR
+// LISTAR CHAMDOS
 app.get('/chamados', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM chamados');
@@ -394,7 +393,7 @@ app.get('/chamados', auth, async (req, res) => {
   }
 });
 
-// CRIAR
+// CRIAR CHAMADOS
 app.post('/chamados', auth, async (req, res) => {
   try {
     const {
@@ -581,8 +580,95 @@ app.put('/chamados/:id', auth, async (req, res) => {
 });
 
 
+// CRIAR LOJAS E SETORES
 
 
+app.get('/lojas', auth, async (req, res) => {
+  const [rows] = await db.query('SELECT * FROM lojas');
+  res.json(rows);
+});
+
+
+app.get('/setores', auth, async (req, res) => {
+  const [rows] = await db.query('SELECT * FROM setores');
+  res.json(rows);
+});
+
+
+
+// CRIAR SOMENTE ADM
+
+app.post('/lojas', auth, async (req, res) => {
+  if (req.user.nivel !== 'adm') {
+    return res.status(403).json({ erro: 'Sem permissão' });
+  }
+
+  const { nome } = req.body;
+
+  await db.query('INSERT INTO lojas (nome) VALUES (?)', [nome]);
+
+  res.json({ sucesso: true });
+});
+
+
+// DELETAR SOMENTE SE FOR USUARIO
+
+app.delete('/lojas/:id', auth, async (req, res) => {
+  if (req.user.nivel !== 'adm') {
+    return res.status(403).json({ erro: 'Sem permissão' });
+  }
+
+  await db.query('DELETE FROM lojas WHERE id = ?', [req.params.id]);
+
+  res.json({ sucesso: true });
+});
+
+
+// DELETAR SETORES SOMENTE SE USUARIO FOR ADM E SETOR NÃO ESTIVER EM USO
+
+// 🗑️ DELETAR SETOR
+app.delete('/setores/:id', auth, async (req, res) => {
+  try {
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    const { id } = req.params;
+
+    const [rows] = await db.query(
+      'SELECT * FROM setores WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Setor não encontrado' });
+    }
+
+    const setorNome = rows[0].nome;
+
+    // 🔥 verifica uso
+    const [emUso] = await db.query(
+      'SELECT id FROM chamados WHERE setor = ? LIMIT 1',
+      [setorNome]
+    );
+
+    if (emUso.length > 0) {
+      return res.status(400).json({
+        erro: `O setor "${setorNome}" está em uso e não pode ser deletado`
+      });
+    }
+
+    await db.query('DELETE FROM setores WHERE id = ?', [id]);
+
+    console.log('🗑️ SETOR DELETADO:', id);
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('💥 ERRO DELETE SETOR:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
 
 // =========================
 // 🚀 SERVER
