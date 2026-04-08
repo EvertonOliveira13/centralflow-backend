@@ -962,6 +962,97 @@ app.put('/departamentos/:id/ativar', auth, async (req, res) => {
 });
 
 
+//================== LISTAR CEASA ITENS ====================//
+
+app.get('/ceasa-itens', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM ceasa_itens
+      WHERE ativo = 1
+      ORDER BY categoria, ordem
+    `);
+
+    res.json(rows);
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+// ==================== SALVAR RESPOSTA CEASA ====================//
+
+app.post('/ceasa', auth, async (req, res) => {
+  try {
+    const { itens } = req.body;
+
+    const loja = req.user.loja;
+    const usuario = req.user.nome;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    // verifica se já existe
+    const [existe] = await db.query(
+      'SELECT id FROM ceasa_respostas WHERE loja = ? AND data = ?',
+      [loja, hoje]
+    );
+
+    if (existe.length > 0) {
+      // atualiza
+      await db.query(
+        'UPDATE ceasa_respostas SET itens = ? WHERE id = ?',
+        [JSON.stringify(itens), existe[0].id]
+      );
+    } else {
+      // cria
+      await db.query(
+        `INSERT INTO ceasa_respostas (loja, usuario, data, itens)
+         VALUES (?, ?, ?, ?)`,
+        [loja, usuario, hoje, JSON.stringify(itens)]
+      );
+    }
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+//===================== DASHBOARD =================//
+
+app.get('/ceasa-dashboard', auth, async (req, res) => {
+  try {
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    const [respostas] = await db.query(
+      'SELECT loja, itens FROM ceasa_respostas WHERE data = ?',
+      [hoje]
+    );
+
+    const resultado = {};
+
+    respostas.forEach(r => {
+      const itens = JSON.parse(r.itens);
+
+      itens.forEach(i => {
+        if (!resultado[i.nome]) {
+          resultado[i.nome] = {};
+        }
+
+        resultado[i.nome][r.loja] = Number(i.quantidade || 0);
+      });
+    });
+
+    res.json(resultado);
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 
 
 
