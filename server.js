@@ -986,26 +986,33 @@ app.get('/ceasa-itens', auth, async (req, res) => {
 app.post('/ceasa', auth, async (req, res) => {
   try {
 
-    const { itens } = req.body;
+    const { cotacao_id, itens } = req.body;
 
     const loja = req.user.loja;
     const usuario = req.user.nome;
 
-    // 🔥 BLOQUEIO IMPORTANTE
+    // 🔥 valida loja
     if (!loja) {
       return res.status(400).json({
         erro: 'Usuário não está vinculado a uma loja'
       });
     }
 
-    // 🔥 validação básica
+    // 🔥 valida cotação
+    if (!cotacao_id) {
+      return res.status(400).json({
+        erro: 'Cotação não informada'
+      });
+    }
+
+    // 🔥 valida itens
     if (!Array.isArray(itens)) {
       return res.status(400).json({
         erro: 'Formato de itens inválido'
       });
     }
 
-    // 🔥 limpar itens (remove 0, vazio, null)
+    // 🔥 limpar itens
     const itensFiltrados = itens
       .map(i => ({
         nome: i.nome,
@@ -1019,17 +1026,14 @@ app.post('/ceasa', auth, async (req, res) => {
       });
     }
 
-    const hoje = new Date().toLocaleDateString('en-CA', {
-  timeZone: 'America/Sao_Paulo'
-});
-
-    // 🔍 verifica se já existe pedido da loja hoje
+    // 🔍 verifica se já existe resposta da loja nessa cotação
     const [existe] = await db.query(
-      'SELECT id FROM ceasa_respostas WHERE loja = ? AND data = ?',
-      [loja, hoje]
+      'SELECT id FROM ceasa_respostas WHERE loja = ? AND cotacao_id = ?',
+      [loja, cotacao_id]
     );
 
     if (existe.length > 0) {
+
       // 🔄 ATUALIZA
       await db.query(
         'UPDATE ceasa_respostas SET itens = ? WHERE id = ?',
@@ -1039,14 +1043,16 @@ app.post('/ceasa', auth, async (req, res) => {
       console.log(`🔄 Pedido atualizado - Loja: ${loja}`);
 
     } else {
+
       // ➕ CRIA
       await db.query(
-        `INSERT INTO ceasa_respostas (loja, usuario, data, itens)
+        `INSERT INTO ceasa_respostas (cotacao_id, loja, usuario, itens)
          VALUES (?, ?, ?, ?)`,
-        [loja, usuario, hoje, JSON.stringify(itensFiltrados)]
+        [cotacao_id, loja, usuario, JSON.stringify(itensFiltrados)]
       );
 
       console.log(`➕ Novo pedido - Loja: ${loja}`);
+
     }
 
     res.json({ sucesso: true });
@@ -1057,6 +1063,144 @@ app.post('/ceasa', auth, async (req, res) => {
   }
 });
 
+//===================CRIAR COTAÇÃO===================//
+
+app.post('/ceasa', auth, async (req, res) => {
+  try {
+
+    const { cotacao_id, itens } = req.body;
+
+    const loja = req.user.loja;
+    const usuario = req.user.nome;
+
+    // 🔥 valida loja
+    if (!loja) {
+      return res.status(400).json({
+        erro: 'Usuário não está vinculado a uma loja'
+      });
+    }
+
+    // 🔥 valida cotação
+    if (!cotacao_id) {
+      return res.status(400).json({
+        erro: 'Cotação não informada'
+      });
+    }
+
+    // 🔥 valida itens
+    if (!Array.isArray(itens)) {
+      return res.status(400).json({
+        erro: 'Formato de itens inválido'
+      });
+    }
+
+    // 🔥 limpar itens
+    const itensFiltrados = itens
+      .map(i => ({
+        nome: i.nome,
+        quantidade: Number(i.quantidade || 0)
+      }))
+      .filter(i => i.nome && i.quantidade > 0);
+
+    if (itensFiltrados.length === 0) {
+      return res.status(400).json({
+        erro: 'Nenhum item com quantidade válida'
+      });
+    }
+
+    // 🔍 verifica se já existe resposta da loja nessa cotação
+    const [existe] = await db.query(
+      'SELECT id FROM ceasa_respostas WHERE loja = ? AND cotacao_id = ?',
+      [loja, cotacao_id]
+    );
+
+    if (existe.length > 0) {
+
+      // 🔄 ATUALIZA
+      await db.query(
+        'UPDATE ceasa_respostas SET itens = ? WHERE id = ?',
+        [JSON.stringify(itensFiltrados), existe[0].id]
+      );
+
+      console.log(`🔄 Pedido atualizado - Loja: ${loja}`);
+
+    } else {
+
+      // ➕ CRIA
+      await db.query(
+        `INSERT INTO ceasa_respostas (cotacao_id, loja, usuario, itens)
+         VALUES (?, ?, ?, ?)`,
+        [cotacao_id, loja, usuario, JSON.stringify(itensFiltrados)]
+      );
+
+      console.log(`➕ Novo pedido - Loja: ${loja}`);
+
+    }
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('❌ ERRO CEASA:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+//===============LISTAR COTAÇÃO ABERTA================//
+
+app.get('/ceasa-cotacao-aberta', auth, async (req, res) => {
+  try {
+
+    const [rows] = await db.query(
+      `SELECT * FROM ceasa_cotacoes 
+       WHERE status = 'aberta'
+       ORDER BY id DESC
+       LIMIT 1`
+    );
+
+    if (rows.length === 0) {
+      return res.json(null);
+    }
+
+    res.json(rows[0]);
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+//=======================FECHAR COTAÇÃO==================//
+
+app.put('/ceasa-cotacoes/:id/fechar', auth, async (req, res) => {
+  try {
+
+    if (req.user.nivel !== 'adm') {
+      return res.status(403).json({ erro: 'Sem permissão' });
+    }
+
+    await db.query(
+      `UPDATE ceasa_cotacoes 
+       SET status = 'fechada'
+       WHERE id = ?`,
+      [req.params.id]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+//=====================CEASA COTACOES================//
+
+app.get('/ceasa-cotacoes', auth, async (req, res) => {
+  const [rows] = await db.query(
+    'SELECT * FROM ceasa_cotacoes ORDER BY id DESC'
+  );
+
+  res.json(rows);
+});
 
 //===================== DASHBOARD =================//
 
