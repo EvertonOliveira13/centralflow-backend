@@ -1019,7 +1019,9 @@ app.post('/ceasa', auth, async (req, res) => {
       });
     }
 
-    const hoje = new Date().toLocaleDateString('sv-SE');
+    const hoje = new Date().toLocaleDateString('en-CA', {
+  timeZone: 'America/Sao_Paulo'
+});
 
     // 🔍 verifica se já existe pedido da loja hoje
     const [existe] = await db.query(
@@ -1060,7 +1062,9 @@ app.post('/ceasa', auth, async (req, res) => {
 
 app.get('/ceasa-dashboard', auth, async (req, res) => {
   try {
-    const hoje = new Date().toLocaleDateString('sv-SE');
+    const hoje = new Date().toLocaleDateString('en-CA', {
+  timeZone: 'America/Sao_Paulo'
+});
 
     const [respostas] = await db.query(
       'SELECT loja, itens FROM ceasa_respostas WHERE data = ?',
