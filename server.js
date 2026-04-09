@@ -1062,39 +1062,109 @@ app.post('/ceasa', auth, async (req, res) => {
 
 app.get('/ceasa-dashboard', auth, async (req, res) => {
   try {
+
+    // 📅 data correta Brasil
     const hoje = new Date().toLocaleDateString('en-CA', {
-  timeZone: 'America/Sao_Paulo'
-});
+      timeZone: 'America/Sao_Paulo'
+    });
+
+    console.log('📅 BUSCANDO DATA:', hoje);
 
     const [respostas] = await db.query(
       'SELECT loja, itens FROM ceasa_respostas WHERE data = ?',
       [hoje]
     );
 
+    console.log('📦 RESPOSTAS:', respostas.length);
+
     const resultado = {};
+    const categorias = {};
 
     respostas.forEach(r => {
-      const itens = JSON.parse(r.itens);
+
+      // 🚫 ignora registros inválidos
+      if (!r.loja) {
+        console.log('⚠️ Registro sem loja ignorado');
+        return;
+      }
+
+      let itens = [];
+
+      // 🔥 tratamento seguro JSON
+      if (typeof r.itens === 'string') {
+        try {
+          itens = JSON.parse(r.itens);
+        } catch (e) {
+          console.log('❌ JSON inválido:', r.itens);
+          return;
+        }
+      } else if (Array.isArray(r.itens)) {
+        itens = r.itens;
+      } else {
+        console.log('❌ Formato desconhecido:', r.itens);
+        return;
+      }
 
       itens.forEach(i => {
-        if (!resultado[i.nome]) {
-          resultado[i.nome] = {
+
+        if (!i.nome) return;
+
+        const nome = i.nome;
+        const qtd = Number(i.quantidade || 0);
+
+        if (qtd <= 0) return;
+
+        // 🔥 cria item se não existir
+        if (!resultado[nome]) {
+          resultado[nome] = {
+            nome,
             lojas: {},
             total: 0
           };
         }
 
-        const qtd = Number(i.quantidade || 0);
+        // 🏪 soma por loja
+        resultado[nome].lojas[r.loja] =
+          (resultado[nome].lojas[r.loja] || 0) + qtd;
 
-        resultado[i.nome].lojas[r.loja] = qtd;
-        resultado[i.nome].total += qtd;
+        // 📊 soma total
+        resultado[nome].total += qtd;
       });
     });
 
-    res.json(resultado);
+    // ==========================
+    // 📊 TRANSFORMAR EM ARRAY
+    // ==========================
+    let lista = Object.values(resultado);
+
+    // 🔥 ordenar por maior total
+    lista.sort((a, b) => b.total - a.total);
+
+    // ==========================
+    // 🏪 extrair lojas únicas
+    // ==========================
+    const lojasSet = new Set();
+
+    lista.forEach(item => {
+      Object.keys(item.lojas).forEach(l => lojasSet.add(l));
+    });
+
+    const lojas = Array.from(lojasSet);
+
+    console.log('🏪 LOJAS:', lojas);
+
+    // ==========================
+    // 📦 resposta final
+    // ==========================
+    res.json({
+      sucesso: true,
+      data: hoje,
+      lojas,
+      itens: lista
+    });
 
   } catch (err) {
-    console.log(err);
+    console.log('❌ ERRO DASHBOARD:', err);
     res.status(500).json({ erro: err.message });
   }
 });
