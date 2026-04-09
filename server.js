@@ -1065,12 +1065,10 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
 
     // 🔥 pega a data mais recente
     const [respostas] = await db.query(`
-      SELECT loja, itens
-      FROM ceasa_respostas
-      WHERE data = (
-        SELECT MAX(data) FROM ceasa_respostas
-      )
-    `);
+  SELECT loja, itens
+  FROM ceasa_respostas
+  WHERE data >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+`);
 
     console.log('📦 RESPOSTAS:', respostas);
 
