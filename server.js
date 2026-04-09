@@ -121,16 +121,17 @@ app.post('/login', async (req, res) => {
     delete usuario.senha;
 
     // 🔥 CRIA TOKEN
-    const token = jwt.sign(
-      {
-        id: usuario.id,
-        nome: usuario.nome,
-        nivel: usuario.nivel,
-        departamento: usuario.departamento
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+   const token = jwt.sign(
+  {
+    id: usuario.id,
+    nome: usuario.nome,
+    nivel: usuario.nivel,
+    departamento: usuario.departamento,
+    loja: usuario.loja // 🔥 AQUI!
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: '7d' }
+);
 
     res.json({ usuario, token });
 
