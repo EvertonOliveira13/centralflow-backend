@@ -984,38 +984,72 @@ app.get('/ceasa-itens', auth, async (req, res) => {
 
 app.post('/ceasa', auth, async (req, res) => {
   try {
+
     const { itens } = req.body;
 
     const loja = req.user.loja;
     const usuario = req.user.nome;
 
+    // 🔥 BLOQUEIO IMPORTANTE
+    if (!loja) {
+      return res.status(400).json({
+        erro: 'Usuário não está vinculado a uma loja'
+      });
+    }
+
+    // 🔥 validação básica
+    if (!Array.isArray(itens)) {
+      return res.status(400).json({
+        erro: 'Formato de itens inválido'
+      });
+    }
+
+    // 🔥 limpar itens (remove 0, vazio, null)
+    const itensFiltrados = itens
+      .map(i => ({
+        nome: i.nome,
+        quantidade: Number(i.quantidade || 0)
+      }))
+      .filter(i => i.nome && i.quantidade > 0);
+
+    if (itensFiltrados.length === 0) {
+      return res.status(400).json({
+        erro: 'Nenhum item com quantidade válida'
+      });
+    }
+
     const hoje = new Date().toISOString().slice(0, 10);
 
-    // verifica se já existe
+    // 🔍 verifica se já existe pedido da loja hoje
     const [existe] = await db.query(
       'SELECT id FROM ceasa_respostas WHERE loja = ? AND data = ?',
       [loja, hoje]
     );
 
     if (existe.length > 0) {
-      // atualiza
+      // 🔄 ATUALIZA
       await db.query(
         'UPDATE ceasa_respostas SET itens = ? WHERE id = ?',
-        [JSON.stringify(itens), existe[0].id]
+        [JSON.stringify(itensFiltrados), existe[0].id]
       );
+
+      console.log(`🔄 Pedido atualizado - Loja: ${loja}`);
+
     } else {
-      // cria
+      // ➕ CRIA
       await db.query(
         `INSERT INTO ceasa_respostas (loja, usuario, data, itens)
          VALUES (?, ?, ?, ?)`,
-        [loja, usuario, hoje, JSON.stringify(itens)]
+        [loja, usuario, hoje, JSON.stringify(itensFiltrados)]
       );
+
+      console.log(`➕ Novo pedido - Loja: ${loja}`);
     }
 
     res.json({ sucesso: true });
 
   } catch (err) {
-    console.log(err);
+    console.log('❌ ERRO CEASA:', err);
     res.status(500).json({ erro: err.message });
   }
 });
@@ -1039,16 +1073,23 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
 
       itens.forEach(i => {
         if (!resultado[i.nome]) {
-          resultado[i.nome] = {};
+          resultado[i.nome] = {
+            lojas: {},
+            total: 0
+          };
         }
 
-        resultado[i.nome][r.loja] = Number(i.quantidade || 0);
+        const qtd = Number(i.quantidade || 0);
+
+        resultado[i.nome].lojas[r.loja] = qtd;
+        resultado[i.nome].total += qtd;
       });
     });
 
     res.json(resultado);
 
   } catch (err) {
+    console.log(err);
     res.status(500).json({ erro: err.message });
   }
 });
@@ -1105,6 +1146,7 @@ app.put('/ceasa-itens/:id/ativar', auth, async (req, res) => {
 
   res.json({ sucesso: true });
 });
+
 
 
 
