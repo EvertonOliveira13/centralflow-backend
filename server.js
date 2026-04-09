@@ -1063,34 +1063,25 @@ app.post('/ceasa', auth, async (req, res) => {
 app.get('/ceasa-dashboard', auth, async (req, res) => {
   try {
 
-    // 📅 data correta Brasil
-    const hoje = new Date().toLocaleDateString('en-CA', {
-      timeZone: 'America/Sao_Paulo'
-    });
+    // 🔥 pega a data mais recente
+    const [respostas] = await db.query(`
+      SELECT loja, itens
+      FROM ceasa_respostas
+      WHERE data = (
+        SELECT MAX(data) FROM ceasa_respostas
+      )
+    `);
 
-    console.log('📅 BUSCANDO DATA:', hoje);
-
-    const [respostas] = await db.query(
-      'SELECT loja, itens FROM ceasa_respostas WHERE data = ?',
-      [hoje]
-    );
-
-    console.log('📦 RESPOSTAS:', respostas.length);
+    console.log('📦 RESPOSTAS:', respostas);
 
     const resultado = {};
-    const categorias = {};
 
     respostas.forEach(r => {
 
-      // 🚫 ignora registros inválidos
-      if (!r.loja) {
-        console.log('⚠️ Registro sem loja ignorado');
-        return;
-      }
+      if (!r.loja) return;
 
       let itens = [];
 
-      // 🔥 tratamento seguro JSON
       if (typeof r.itens === 'string') {
         try {
           itens = JSON.parse(r.itens);
@@ -1098,51 +1089,35 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
           console.log('❌ JSON inválido:', r.itens);
           return;
         }
-      } else if (Array.isArray(r.itens)) {
-        itens = r.itens;
       } else {
-        console.log('❌ Formato desconhecido:', r.itens);
-        return;
+        itens = r.itens;
       }
 
       itens.forEach(i => {
 
         if (!i.nome) return;
 
-        const nome = i.nome;
         const qtd = Number(i.quantidade || 0);
-
         if (qtd <= 0) return;
 
-        // 🔥 cria item se não existir
-        if (!resultado[nome]) {
-          resultado[nome] = {
-            nome,
+        if (!resultado[i.nome]) {
+          resultado[i.nome] = {
+            nome: i.nome,
             lojas: {},
             total: 0
           };
         }
 
-        // 🏪 soma por loja
-        resultado[nome].lojas[r.loja] =
-          (resultado[nome].lojas[r.loja] || 0) + qtd;
+        resultado[i.nome].lojas[r.loja] =
+          (resultado[i.nome].lojas[r.loja] || 0) + qtd;
 
-        // 📊 soma total
-        resultado[nome].total += qtd;
+        resultado[i.nome].total += qtd;
+
       });
     });
 
-    // ==========================
-    // 📊 TRANSFORMAR EM ARRAY
-    // ==========================
-    let lista = Object.values(resultado);
+    const lista = Object.values(resultado).sort((a, b) => b.total - a.total);
 
-    // 🔥 ordenar por maior total
-    lista.sort((a, b) => b.total - a.total);
-
-    // ==========================
-    // 🏪 extrair lojas únicas
-    // ==========================
     const lojasSet = new Set();
 
     lista.forEach(item => {
@@ -1151,16 +1126,9 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
 
     const lojas = Array.from(lojasSet);
 
-    console.log('🏪 LOJAS:', lojas);
-
-    // ==========================
-    // 📦 resposta final
-    // ==========================
     res.json({
-      sucesso: true,
-      data: hoje,
-      lojas,
-      itens: lista
+      itens: lista,
+      lojas
     });
 
   } catch (err) {
@@ -1168,8 +1136,6 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
-
-
 
 //=========== CEASA CRIAR ITEM ===============//
 
