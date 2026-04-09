@@ -1279,6 +1279,61 @@ app.get('/ceasa-dashboard', auth, async (req, res) => {
   }
 });
 
+//=============================================//
+
+app.get('/ceasa-dashboard/:cotacaoId', auth, async (req, res) => {
+  try {
+
+    const { cotacaoId } = req.params;
+
+    // 🔥 pega cotação
+    const [[cotacao]] = await db.query(
+      'SELECT * FROM ceasa_cotacoes WHERE id = ?',
+      [cotacaoId]
+    );
+
+    const [rows] = await db.query(
+      'SELECT loja, itens FROM ceasa_respostas WHERE cotacao_id = ?',
+      [cotacaoId]
+    );
+
+    const resultado = {};
+    const lojasSet = new Set();
+
+    rows.forEach(r => {
+      const itens = JSON.parse(r.itens);
+
+      lojasSet.add(r.loja);
+
+      itens.forEach(i => {
+        if (!resultado[i.nome]) {
+          resultado[i.nome] = {
+            nome: i.nome,
+            lojas: {},
+            total: 0
+          };
+        }
+
+        const qtd = Number(i.quantidade || 0);
+
+        resultado[i.nome].lojas[r.loja] = qtd;
+        resultado[i.nome].total += qtd;
+      });
+    });
+
+    res.json({
+      itens: Object.values(resultado),
+      lojas: Array.from(lojasSet),
+      cotacao
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
 //=========== CEASA CRIAR ITEM ===============//
 
 app.post('/ceasa-itens', auth, async (req, res) => {
