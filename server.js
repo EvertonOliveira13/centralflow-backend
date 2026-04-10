@@ -1386,7 +1386,63 @@ app.put('/ceasa-itens/:id/ativar', auth, async (req, res) => {
 });
 
 
+//================== rotas cotação ====================//
 
+app.post('/cotacoes', auth, async (req, res) => {
+  try {
+    const { nome, setor } = req.body;
+
+    if (!nome || !setor) {
+      return res.status(400).json({
+        erro: 'Nome e setor são obrigatórios'
+      });
+    }
+
+    await db.query(
+      `INSERT INTO cotacoes (nome, setor, status, data)
+       VALUES (?, ?, 'aberta', CURDATE())`,
+      [nome, setor]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log('❌ ERRO AO CRIAR COTAÇÃO:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+app.get('/cotacoes', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM cotacoes ORDER BY id DESC'
+    );
+
+    res.json(rows);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+
+
+app.put('/cotacoes/:id/fechar', auth, async (req, res) => {
+  try {
+    await db.query(
+      'UPDATE cotacoes SET status = "fechada" WHERE id = ?',
+      [req.params.id]
+    );
+
+    res.json({ sucesso: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: err.message });
+  }
+});
 
 
 // =========================
