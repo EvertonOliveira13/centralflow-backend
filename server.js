@@ -982,7 +982,7 @@ app.get('/ceasa-itens', auth, async (req, res) => {
 
 
 // ==================== SALVAR RESPOSTA CEASA ====================//
-
+/*
 app.post('/ceasa', auth, async (req, res) => {
   try {
 
@@ -1011,7 +1011,7 @@ app.post('/ceasa', auth, async (req, res) => {
         erro: 'Formato de itens inválido'
       });
     }
-
+*/
     // 🔥 limpar itens
     const itensFiltrados = itens
       .map(i => ({
@@ -1181,7 +1181,7 @@ app.put('/ceasa-cotacoes/:id/fechar', auth, async (req, res) => {
     }
 
     await db.query(
-      `UPDATE ceasa_cotacoes 
+      `UPDATE cotacoes 
        SET status = 'fechada'
        WHERE id = ?`,
       [req.params.id]
@@ -1198,12 +1198,11 @@ app.put('/ceasa-cotacoes/:id/fechar', auth, async (req, res) => {
 
 app.get('/ceasa-cotacoes', auth, async (req, res) => {
   const [rows] = await db.query(
-    'SELECT * FROM ceasa_cotacoes ORDER BY id DESC'
+    'SELECT * FROM cotacoes WHERE setor = "CEASA" ORDER BY id DESC'
   );
 
   res.json(rows);
 });
-
 //===================== DASHBOARD =================//
 
 app.get('/ceasa-dashboard', auth, async (req, res) => {
@@ -1290,7 +1289,7 @@ app.get('/ceasa-dashboard/:cotacaoId', auth, async (req, res) => {
 
     // 🔥 pega cotação
     const [[cotacao]] = await db.query(
-      'SELECT * FROM ceasa_cotacoes WHERE id = ?',
+  'SELECT * FROM cotacoes WHERE id = ?',
       [cotacaoId]
     );
 
