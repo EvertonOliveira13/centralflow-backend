@@ -1150,12 +1150,13 @@ app.post('/ceasa', auth, async (req, res) => {
 app.get('/ceasa-cotacao-aberta', auth, async (req, res) => {
   try {
 
-    const [rows] = await db.query(
-      `SELECT * FROM ceasa_cotacoes 
-       WHERE status = 'aberta'
-       ORDER BY id DESC
-       LIMIT 1`
-    );
+    const [rows] = await db.query(`
+      SELECT *
+      FROM cotacoes
+      WHERE setor = 'CEASA' AND status = 'aberta'
+      ORDER BY id DESC
+      LIMIT 1
+    `);
 
     if (rows.length === 0) {
       return res.json(null);
@@ -1164,6 +1165,7 @@ app.get('/ceasa-cotacao-aberta', auth, async (req, res) => {
     res.json(rows[0]);
 
   } catch (err) {
+    console.log('❌ ERRO COTAÇÃO:', err);
     res.status(500).json({ erro: err.message });
   }
 });
