@@ -1027,11 +1027,11 @@ app.post('/ceasa', auth, async (req, res) => {
     }
 
     // 🔍 verifica se já existe resposta da loja nessa cotação
-   /* const [existe] = await db.query(
+    const [existe] = await db.query(
       'SELECT id FROM ceasa_respostas WHERE loja = ? AND cotacao_id = ?',
       [loja, cotacao_id]
     );
-*/
+
     if (existe.length > 0) {
 
       // 🔄 ATUALIZA
