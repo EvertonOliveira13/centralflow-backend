@@ -1122,83 +1122,7 @@ app.get('/ceasa-cotacoes', auth, async (req, res) => {
   res.json(rows);
 });
 //===================== DASHBOARD =================//
-/*
-app.get('/ceasa-dashboard', auth, async (req, res) => {
-  try {
 
-    // 🔥 pega a data mais recente
-    const [respostas] = await db.query(`
-  SELECT loja, itens
-  FROM ceasa_respostas
-  WHERE data >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
-`);
-
-    console.log('📦 RESPOSTAS:', respostas);
-
-    const resultado = {};
-
-    respostas.forEach(r => {
-
-      if (!r.loja) return;
-
-      let itens = [];
-
-      if (typeof r.itens === 'string') {
-        try {
-          itens = JSON.parse(r.itens);
-        } catch (e) {
-          console.log('❌ JSON inválido:', r.itens);
-          return;
-        }
-      } else {
-        itens = r.itens;
-      }
-
-      itens.forEach(i => {
-
-        if (!i.nome) return;
-
-        const qtd = Number(i.quantidade || 0);
-        if (qtd <= 0) return;
-
-        if (!resultado[i.nome]) {
-          resultado[i.nome] = {
-            nome: i.nome,
-            lojas: {},
-            total: 0
-          };
-        }
-
-        resultado[i.nome].lojas[r.loja] =
-          (resultado[i.nome].lojas[r.loja] || 0) + qtd;
-
-        resultado[i.nome].total += qtd;
-
-      });
-    });
-
-    const lista = Object.values(resultado).sort((a, b) => b.total - a.total);
-
-    const lojasSet = new Set();
-
-    lista.forEach(item => {
-      Object.keys(item.lojas).forEach(l => lojasSet.add(l));
-    });
-
-    const lojas = Array.from(lojasSet);
-
-    res.json({
-      itens: lista,
-      lojas
-    });
-
-  } catch (err) {
-    console.log('❌ ERRO DASHBOARD:', err);
-    res.status(500).json({ erro: err.message });
-  }
-});
-*/
-//=============================================//
 
 app.get('/ceasa-dashboard/:cotacaoId', auth, async (req, res) => {
   try {
@@ -1387,6 +1311,17 @@ app.put('/cotacoes/:id/fechar', auth, async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
+
+
+
+
+//===============Rota produtos====================//
+
+
+
+
+
+
 
 
 // =========================
