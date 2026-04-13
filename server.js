@@ -1364,7 +1364,7 @@ app.get('/produtos', async (req, res) => {
 
 //=================SALVAR CONTAGEM
 
-app.post('/contagem', authMiddleware, async (req, res) => {
+app.post('/contagem', auth, async (req, res) => {
   try {
 
     const { tipo, itens } = req.body;
