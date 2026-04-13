@@ -1348,8 +1348,8 @@ app.post('/contagem', authMiddleware, async (req, res) => {
 
     const { tipo, itens } = req.body;
 
-    const loja = req.usuario.loja;
-    const usuario = req.usuario.nome;
+    const loja = req.user.loja;
+    const usuario = req.user.nome;
 
     // cria contagem
     const [result] = await db.query(
