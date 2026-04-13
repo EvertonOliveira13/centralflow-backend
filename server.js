@@ -140,7 +140,7 @@ app.post('/login', async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
-
+/*
 function auth(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -157,8 +157,29 @@ function auth(req, res, next) {
   } catch (err) {
     return res.status(401).json({ erro: 'Token inválido' });
   }
-}
+}*/
 
+function auth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ erro: 'Token não enviado' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // ✅ mantém os dois
+    req.user = decoded;
+    req.usuario = decoded;
+
+    next();
+  } catch (err) {
+    return res.status(401).json({ erro: 'Token inválido' });
+  }
+}
 
 
 // =========================
