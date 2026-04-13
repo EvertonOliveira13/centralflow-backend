@@ -1360,9 +1360,18 @@ app.post('/contagem', async (req, res) => {
 
     const contagemId = result.insertId;
 
+console.log('📦 BODY:', JSON.stringify(req.body, null, 2));
+
     // salva itens
     for (const item of itens) {
+
+      console.log('👉 ITEM:', item);
+
+
       for (const lote of item.lotes) {
+
+        
+console.log('👉 LOTE:', lote);
 
         // ignora vazios
         if (!lote.quantidade || !lote.validade) continue;
