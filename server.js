@@ -1421,35 +1421,57 @@ console.log('👉 LOTE:', lote);
 
 //=================DASHBOARD CONTAGEM
 
-/**
- * 
- * app.get('/contagem-dashboard/:tipo', async (req, res) => {
+app.get('/contagem-dashboard/:id', auth, async (req, res) => {
   try {
 
-    const { tipo } = req.params;
+    const contagemId = req.params.id;
 
     const [rows] = await db.query(`
       SELECT 
-        c.loja,
-        p.nome,
+        p.nome AS produto,
+        ci.loja,
         ci.quantidade,
         ci.validade
       FROM contagem_itens ci
-      JOIN contagens c ON c.id = ci.contagem_id
       JOIN produtos p ON p.id = ci.produto_id
-      WHERE c.tipo = ?
-      ORDER BY p.nome, ci.validade
-    `, [tipo]);
+      WHERE ci.contagem_id = ?
+      ORDER BY p.nome, ci.loja, ci.validade
+    `, [contagemId]);
 
-    res.json(rows);
+    const mapa = {};
+    const lojasSet = new Set();
+
+    for (const row of rows) {
+
+      lojasSet.add(row.loja);
+
+      if (!mapa[row.produto]) {
+        mapa[row.produto] = {
+          nome: row.produto,
+          lojas: {}
+        };
+      }
+
+      if (!mapa[row.produto].lojas[row.loja]) {
+        mapa[row.produto].lojas[row.loja] = [];
+      }
+
+      mapa[row.produto].lojas[row.loja].push({
+        qtd: row.quantidade,
+        validade: row.validade
+      });
+    }
+
+    res.json({
+      itens: Object.values(mapa),
+      lojas: Array.from(lojasSet)
+    });
 
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ erro: 'Erro dashboard' });
+    console.log('❌ ERRO DASHBOARD:', err);
+    res.status(500).json({ erro: 'Erro ao carregar dashboard' });
   }
 });
- * 
- */
 
 
 
