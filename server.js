@@ -1318,6 +1318,109 @@ app.put('/cotacoes/:id/fechar', auth, async (req, res) => {
 //===============Rota produtos====================//
 
 
+//==============BUSCAR PRODUTOD POR TIPO
+
+app.get('/produtos', async (req, res) => {
+  try {
+    const { tipo } = req.query;
+
+    const [rows] = await db.query(`
+      SELECT p.id, p.nome
+      FROM produtos p
+      JOIN mercadologico m ON m.id = p.mercadologico_id
+      WHERE m.nome = ?
+      ORDER BY p.nome
+    `, [tipo]);
+
+    res.json(rows);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: 'Erro ao buscar produtos' });
+  }
+});
+
+
+//=================SALVAR CONTAGEM
+
+app.post('/contagem', async (req, res) => {
+  try {
+
+    const { tipo, itens } = req.body;
+
+    const loja = req.usuario.loja;
+    const usuario = req.usuario.nome;
+
+    // cria contagem
+    const [result] = await db.query(
+      `INSERT INTO contagens (loja, usuario, tipo, data)
+       VALUES (?, ?, ?, NOW())`,
+      [loja, usuario, tipo]
+    );
+
+    const contagemId = result.insertId;
+
+    // salva itens
+    for (const item of itens) {
+      for (const lote of item.lotes) {
+
+        // ignora vazios
+        if (!lote.quantidade || !lote.validade) continue;
+
+        await db.query(`
+          INSERT INTO contagem_itens 
+          (contagem_id, produto_id, quantidade, validade)
+          VALUES (?, ?, ?, ?)
+        `, [
+          contagemId,
+          item.produto_id,
+          lote.quantidade,
+          lote.validade
+        ]);
+      }
+    }
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: 'Erro ao salvar contagem' });
+  }
+});
+
+
+//=================DASHBOARD CONTAGEM
+
+/**
+ * 
+ * app.get('/contagem-dashboard/:tipo', async (req, res) => {
+  try {
+
+    const { tipo } = req.params;
+
+    const [rows] = await db.query(`
+      SELECT 
+        c.loja,
+        p.nome,
+        ci.quantidade,
+        ci.validade
+      FROM contagem_itens ci
+      JOIN contagens c ON c.id = ci.contagem_id
+      JOIN produtos p ON p.id = ci.produto_id
+      WHERE c.tipo = ?
+      ORDER BY p.nome, ci.validade
+    `, [tipo]);
+
+    res.json(rows);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: 'Erro dashboard' });
+  }
+});
+ * 
+ */
+
 
 
 
