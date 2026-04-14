@@ -1399,13 +1399,14 @@ console.log('👉 LOTE:', lote);
 
         await db.query(`
           INSERT INTO contagem_itens 
-          (contagem_id, produto_id, quantidade, validade)
-          VALUES (?, ?, ?, ?)
+          (contagem_id, produto_id, quantidade, validade, loja)
+          VALUES (?, ?, ?, ?, ?)
         `, [
           contagemId,
           item.produto_id,
           lote.quantidade,
-          lote.validade
+          lote.validade,
+          loja // 🔥 ESSENCIAL
         ]);
       }
     }
