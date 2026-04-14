@@ -1474,7 +1474,31 @@ app.get('/contagem-dashboard/:id', auth, async (req, res) => {
 });
 
 
+//=====================COMTAGENS=========================//
 
+app.post('/contagens', auth, async (req, res) => {
+  try {
+
+    const { tipo } = req.body;
+
+    const loja = req.user.loja;
+    const usuario = req.user.nome;
+
+    const [result] = await db.query(`
+      INSERT INTO contagens (loja, usuario, tipo, status, data)
+      VALUES (?, ?, ?, 'ABERTA', NOW())
+    `, [loja, usuario, tipo]);
+
+    res.json({
+      ok: true,
+      id: result.insertId
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: 'Erro ao criar contagem' });
+  }
+});
 
 
 
