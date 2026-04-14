@@ -1501,6 +1501,27 @@ app.post('/contagens', auth, async (req, res) => {
 });
 
 
+//================ IMPORTAR CONTAGENS (TELA CONTAGEM LEITE E ARROZ)====================//
+
+app.get('/contagens', auth, async (req, res) => {
+  try {
+
+    const loja = req.user.loja;
+
+    const [rows] = await db.query(`
+      SELECT * FROM contagens
+      WHERE loja = ?
+      ORDER BY id DESC
+    `, [loja]);
+
+    res.json(rows);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ erro: 'Erro ao buscar contagens' });
+  }
+});
+
 
 
 // =========================
