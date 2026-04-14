@@ -1510,9 +1510,8 @@ app.get('/contagens', auth, async (req, res) => {
 
     const [rows] = await db.query(`
       SELECT * FROM contagens
-      WHERE loja = ?
       ORDER BY id DESC
-    `, [loja]);
+    `);
 
     res.json(rows);
 
